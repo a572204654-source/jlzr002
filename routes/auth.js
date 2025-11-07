@@ -7,18 +7,9 @@ const { query } = require('../config/database')
 const { authenticate } = require('../middleware/auth')
 
 /**
- * 微信登录
- * POST /api/auth/wechat-login
- * 
- * 请求参数:
- * - code: 微信登录code
- * 
- * 返回数据:
- * - token: JWT token
- * - isNewUser: 是否新用户
- * - userInfo: 用户信息
+ * 微信登录处理函数
  */
-router.post('/wechat-login', async (req, res) => {
+async function handleWechatLogin(req, res) {
   try {
     const { code } = req.body
 
@@ -99,7 +90,23 @@ router.post('/wechat-login', async (req, res) => {
     console.error('登录错误:', error)
     return serverError(res, error.message || '登录失败')
   }
-})
+}
+
+/**
+ * 微信登录
+ * POST /api/auth/wechat-login
+ * POST /api/auth/login（别名）
+ * 
+ * 请求参数:
+ * - code: 微信登录code
+ * 
+ * 返回数据:
+ * - token: JWT token
+ * - isNewUser: 是否新用户
+ * - userInfo: 用户信息
+ */
+router.post('/wechat-login', handleWechatLogin)
+router.post('/login', handleWechatLogin)  // 添加别名，兼容常规命名
 
 /**
  * 退出登录

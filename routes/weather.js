@@ -26,8 +26,10 @@ const weatherCache = new NodeCache({ stdTTL: 300 })
  * - windDirection: 风向
  * - windScale: 风力等级
  * - updateTime: 更新时间
+ * 
+ * 注意：天气查询为公开接口，不需要登录
  */
-router.get('/current', authenticate, async (req, res) => {
+router.get('/current', async (req, res) => {
   try {
     const { latitude, longitude } = req.query
 
