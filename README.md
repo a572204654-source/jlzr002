@@ -248,12 +248,52 @@ cloudrun-express/
 │   ├── index.js           # 测试入口
 │   ├── tests/             # 测试用例
 │   └── utils/             # 测试工具
-├── miniapp-example/        # 小程序示例代码
+├── miniapp-example/        # 小程序示例代码（⭐ 前端对接必看）
+│   ├── README.md          # 小程序前端使用指南
+│   ├── 一键复制-Word导出.js  # Word导出功能（推荐）
+│   ├── 错误修复指南.md     # 常见问题解决方案
+│   ├── api.js             # API接口封装
+│   └── request.js         # 网络请求封装
 ├── app.js                  # 应用入口
 ├── .env                    # 环境变量
 ├── package.json            # 项目配置
 └── README.md              # 本文档
 ```
+
+## 小程序前端对接
+
+本项目提供完整的小程序前端示例代码，支持快速集成。
+
+### 📦 快速开始
+
+1. 查看 [`miniapp-example/README.md`](./miniapp-example/README.md) - 完整的前端使用指南
+2. 复制 [`miniapp-example/一键复制-Word导出.js`](./miniapp-example/一键复制-Word导出.js) - 一键集成Word导出
+3. 参考 [`miniapp-example/错误修复指南.md`](./miniapp-example/错误修复指南.md) - 解决常见问题
+
+### ⚡ Word导出功能（3步集成）
+
+```javascript
+// 1. 复制文件到你的小程序项目 utils 目录
+// 2. 修改 BASE_URL 为你的后端地址
+const BASE_URL = 'https://your-domain.com'
+
+// 3. 在页面中调用
+const { exportWord } = require('../../utils/word-export')
+exportWord(logId)
+```
+
+### 📚 示例代码
+
+- **完整API封装**: [`miniapp-example/api.js`](./miniapp-example/api.js)
+- **网络请求**: [`miniapp-example/request.js`](./miniapp-example/request.js)
+- **Word导出**: [`miniapp-example/word-export-example.js`](./miniapp-example/word-export-example.js)
+- **Vue页面示例**: [`miniapp-example/Vue页面Word导出示例.vue`](./miniapp-example/Vue页面Word导出示例.vue)
+
+### 🎯 后端升级说明
+
+后端Word导出功能已升级到v2.0，但**前端代码完全向后兼容**，无需修改！
+
+详见：[`前端代码兼容性说明.md`](./前端代码兼容性说明.md)
 
 ## 开发规范
 

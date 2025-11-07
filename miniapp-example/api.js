@@ -134,7 +134,20 @@ const supervisionLog = {
     return del(`/api/v1/supervision-logs/${id}`)
   },
 
-  // 导出Word
+  /**
+   * 导出Word文档
+   * 注意：此方法仅适用于 wx.request 方式
+   * 推荐使用 wx.downloadFile 直接下载，参考 word-export-example.js
+   * 
+   * @param {Number} id - 日志ID
+   * @returns {Promise<ArrayBuffer>} Word文档二进制数据
+   * 
+   * 使用示例：
+   * const data = await supervisionLog.exportWord(123)
+   * // 然后需要手动写入文件...
+   * 
+   * 更简单的方式请查看：miniapp-example/word-export-example.js
+   */
   exportWord(id) {
     return get(`/api/v1/supervision-logs/${id}/export`, {}, {
       responseType: 'arraybuffer'

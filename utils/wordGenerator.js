@@ -6,7 +6,7 @@ const { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, Alig
  * @returns {Promise<Buffer>} Word文档Buffer
  */
 async function generateSupervisionLogWord(logData) {
-  try {
+    try {
     // 创建文档
     const doc = new Document({
       sections: [{
@@ -21,7 +21,7 @@ async function generateSupervisionLogWord(logData) {
           }
         },
         children: [
-          // ============== 标题 ==============
+      // ============== 标题 ==============
           new Paragraph({
             text: '监理日志',
             alignment: AlignmentType.CENTER,
@@ -226,7 +226,7 @@ async function generateSupervisionLogWord(logData) {
           }
         ]
       }
-    })
+      })
 
     // 生成Buffer
     const buffer = await Packer.toBuffer(doc)
@@ -253,7 +253,7 @@ function createCenteredParagraph(text, bold = false) {
         size: 24,  // 12pt
         bold: bold,
         font: '宋体'
-      })
+        })
     ]
   })
 }
@@ -271,10 +271,10 @@ function createLeftParagraph(text) {
         text: text,
         size: 24,  // 12pt
         font: '宋体'
-      })
+          })
     ]
-  })
-}
+        })
+      }
 
 /**
  * 创建内容段落（带缩进）
