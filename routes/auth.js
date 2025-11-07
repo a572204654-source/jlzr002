@@ -1,0 +1,176 @@
+const express = require('express')
+const router = express.Router()
+const { success, badRequest, serverError } = require('../utils/response')
+const { code2Session } = require('../utils/wechat')
+const { generateToken } = require('../utils/jwt')
+const { query } = require('../config/database')
+const { authenticate } = require('../middleware/auth')
+
+/**
+ * 微信登录
+ * POST /api/auth/wechat-login
+ * 
+ * 请求参数:
+ * - code: 微信登录code
+ * 
+ * 返回数据:
+ * - token: JWT token
+ * - isNewUser: 是否新用户
+ * - userInfo: 用户信息
+ */
+router.post('/wechat-login', async (req, res) => {
+  try {
+    const { code } = req.body
+
+    if (!code) {
+      return badRequest(res, '缺少登录code')
+    }
+
+    let openid, sessionKey, unionid
+
+    // 🧪 开发环境：支持测试code
+    if (process.env.NODE_ENV === 'development' && code.startsWith('test_wechat_code_')) {
+      console.log('🧪 [测试模式] 使用测试登录code:', code)
+      openid = 'test_openid_888888'
+      sessionKey = 'test_session_key'
+      unionid = ''
+    } else {
+      // 生产环境：调用真实微信API
+      const result = await code2Session(code)
+      openid = result.openid
+      sessionKey = result.sessionKey
+      unionid = result.unionid
+    }
+
+    // 查询用户是否存在
+    let users = await query(
+      'SELECT * FROM users WHERE openid = ?',
+      [openid]
+    )
+
+    let user
+    let isNewUser = false
+
+    if (users.length === 0) {
+      // 新用户，创建用户记录
+      const result = await query(
+        'INSERT INTO users (openid, unionid, nickname) VALUES (?, ?, ?)',
+        [openid, unionid || '', `用户${Date.now().toString().slice(-6)}`]
+      )
+
+      user = {
+        id: result.insertId,
+        openid,
+        unionid: unionid || '',
+        nickname: `用户${Date.now().toString().slice(-6)}`,
+        avatar: '',
+        organization: ''
+      }
+
+      isNewUser = true
+    } else {
+      user = users[0]
+    }
+
+    // 生成JWT token
+    const token = generateToken({
+      userId: user.id,
+      openid: user.openid
+    })
+
+    // 返回登录信息（字段使用驼峰命名）
+    const message = (process.env.NODE_ENV === 'development' && req.body.code.startsWith('test_wechat_code_')) 
+      ? '登录成功（测试模式）' 
+      : '登录成功'
+
+    return success(res, {
+      token,
+      isNewUser,
+      userInfo: {
+        id: user.id,
+        openid: user.openid,
+        nickname: user.nickname,
+        avatar: user.avatar,
+        organization: user.organization
+      }
+    }, message)
+
+  } catch (error) {
+    console.error('登录错误:', error)
+    return serverError(res, error.message || '登录失败')
+  }
+})
+
+/**
+ * 退出登录
+ * POST /api/auth/logout
+ */
+router.post('/logout', authenticate, async (req, res) => {
+  try {
+    // 这里可以添加token黑名单逻辑
+    // 目前只返回成功，前端清除token即可
+    return success(res, {}, '退出成功')
+  } catch (error) {
+    console.error('退出登录错误:', error)
+    return serverError(res, '退出登录失败')
+  }
+})
+
+/**
+ * 测试登录（仅用于开发测试）
+ * POST /api/auth/test-login
+ * 
+ * 请求参数:
+ * - openid: 测试用户的openid
+ * 
+ * 返回数据:
+ * - token: JWT token
+ * - userInfo: 用户信息
+ */
+router.post('/test-login', async (req, res) => {
+  try {
+    const { openid } = req.body
+
+    if (!openid) {
+      return badRequest(res, '缺少openid')
+    }
+
+    // 查询用户
+    const users = await query(
+      'SELECT * FROM users WHERE openid = ?',
+      [openid]
+    )
+
+    if (users.length === 0) {
+      return badRequest(res, '用户不存在')
+    }
+
+    const user = users[0]
+
+    // 生成JWT token
+    const token = generateToken({
+      userId: user.id,
+      openid: user.openid
+    })
+
+    // 返回登录信息（字段使用驼峰命名）
+    return success(res, {
+      token,
+      isNewUser: false,
+      userInfo: {
+        id: user.id,
+        openid: user.openid,
+        nickname: user.nickname,
+        avatar: user.avatar,
+        organization: user.organization
+      }
+    }, '测试登录成功')
+
+  } catch (error) {
+    console.error('测试登录错误:', error)
+    return serverError(res, error.message || '测试登录失败')
+  }
+})
+
+module.exports = router
+

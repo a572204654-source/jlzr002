@@ -1,0 +1,21 @@
+{
+  "envId": "cloud1-5gtce4ym5a28e1b9",
+  "version": "2.0",
+  "$schema": "https://framework-1258016615.tcloudbaseapp.com/schema/latest.json",
+  "framework": {
+    "name": "supervision-log-api",
+    "plugins": {
+      "container": {
+        "use": "@cloudbase/framework-plugin-container",
+        "inputs": {
+          "serviceName": "supervision-log-api",
+          "servicePath": "/",
+          "containerPort": 80,
+          "dockerfilePath": "./Dockerfile",
+          "buildDir": "."
+        }
+      }
+    }
+  }
+}
+

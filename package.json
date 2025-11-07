@@ -1,0 +1,35 @@
+{
+  "name": "express",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node ./bin/www",
+    "dev": "nodemon ./bin/www",
+    "setup": "node scripts/setup.js",
+    "init-db": "node scripts/init-db.js",
+    "init-data": "node scripts/init-db-data.js",
+    "test-api": "node api-tests/index.js"
+  },
+  "dependencies": {
+    "@cloudbase/node-sdk": "^3.14.1",
+    "axios": "^1.6.0",
+    "cookie-parser": "~1.4.4",
+    "cors": "^2.8.5",
+    "debug": "~2.6.9",
+    "docx-templates": "^4.14.1",
+    "docxtemplater": "^3.67.3",
+    "dotenv": "^16.3.1",
+    "express": "~4.16.1",
+    "hbs": "~4.0.4",
+    "http-errors": "~1.6.3",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "~1.9.1",
+    "mysql2": "^3.6.0",
+    "node-cache": "^5.1.2",
+    "officegen": "^0.6.5",
+    "pizzip": "^3.2.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

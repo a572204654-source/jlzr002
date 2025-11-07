@@ -1,0 +1,285 @@
+const express = require('express')
+const router = express.Router()
+const { success, badRequest, serverError, notFound, forbidden } = require('../../utils/response')
+const { query } = require('../../config/database')
+const { authenticate } = require('../../middleware/auth')
+
+/**
+ * 获取工程列表
+ * GET /api/v1/works
+ */
+router.get('/works', authenticate, async (req, res) => {
+  try {
+    const projectId = req.query.projectId
+    const page = parseInt(req.query.page) || 1
+    const pageSize = parseInt(req.query.pageSize) || 20
+    const offset = (page - 1) * pageSize
+    const keyword = req.query.keyword || ''
+
+    // 构建查询条件
+    let whereClause = '1=1'
+    const params = []
+
+    if (projectId) {
+      whereClause += ' AND w.project_id = ?'
+      params.push(projectId)
+    }
+
+    if (keyword) {
+      whereClause += ' AND (w.work_name LIKE ? OR w.work_code LIKE ?)'
+      params.push(`%${keyword}%`, `%${keyword}%`)
+    }
+
+    // 查询工程列表
+    const works = await query(
+      `SELECT 
+        w.id,
+        w.project_id as projectId,
+        w.work_name as workName,
+        w.work_code as workCode,
+        w.unit_work as unitWork,
+        w.start_date as startDate,
+        w.end_date as endDate,
+        w.color,
+        w.created_at as createdAt
+       FROM works w
+       WHERE ${whereClause}
+       ORDER BY w.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [...params, pageSize, offset]
+    )
+
+    // 查询总数
+    const [countResult] = await query(
+      `SELECT COUNT(*) as total FROM works w WHERE ${whereClause}`,
+      params
+    )
+
+    return success(res, {
+      total: countResult.total,
+      page,
+      pageSize,
+      list: works
+    })
+
+  } catch (error) {
+    console.error('获取工程列表错误:', error)
+    return serverError(res, '获取工程列表失败')
+  }
+})
+
+/**
+ * 获取工程详情
+ * GET /api/v1/works/:id
+ */
+router.get('/works/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    // 查询工程详情
+    const works = await query(
+      `SELECT 
+        w.id,
+        w.project_id as projectId,
+        p.project_name as projectName,
+        p.project_code as projectCode,
+        w.work_name as workName,
+        w.work_code as workCode,
+        w.unit_work as unitWork,
+        w.start_date as startDate,
+        w.end_date as endDate,
+        w.color,
+        w.description,
+        p.organization,
+        p.chief_engineer as chiefEngineer,
+        w.created_at as createdAt
+       FROM works w
+       LEFT JOIN projects p ON w.project_id = p.id
+       WHERE w.id = ?`,
+      [id]
+    )
+
+    if (works.length === 0) {
+      return notFound(res, '工程不存在')
+    }
+
+    return success(res, works[0])
+
+  } catch (error) {
+    console.error('获取工程详情错误:', error)
+    return serverError(res, '获取工程详情失败')
+  }
+})
+
+/**
+ * 新增工程
+ * POST /api/v1/works
+ */
+router.post('/works', authenticate, async (req, res) => {
+  try {
+    const userId = req.userId
+    const {
+      projectId,
+      workName,
+      workCode,
+      unitWork,
+      startDate,
+      endDate,
+      color,
+      description
+    } = req.body
+
+    // 参数验证
+    if (!projectId) {
+      return badRequest(res, '项目ID不能为空')
+    }
+    if (!workName) {
+      return badRequest(res, '工程名称不能为空')
+    }
+    if (!workCode) {
+      return badRequest(res, '工程编号不能为空')
+    }
+    if (!unitWork) {
+      return badRequest(res, '单位工程不能为空')
+    }
+
+    // 检查项目是否存在
+    const projects = await query(
+      'SELECT id FROM projects WHERE id = ?',
+      [projectId]
+    )
+
+    if (projects.length === 0) {
+      return notFound(res, '项目不存在')
+    }
+
+    // 检查工程编号是否已存在
+    const existing = await query(
+      'SELECT id FROM works WHERE work_code = ?',
+      [workCode]
+    )
+
+    if (existing.length > 0) {
+      return badRequest(res, '工程编号已存在')
+    }
+
+    // 创建工程
+    const result = await query(
+      `INSERT INTO works 
+        (project_id, work_name, work_code, unit_work, start_date, end_date, color, description, creator_id) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [projectId, workName, workCode, unitWork, startDate || null, endDate || null, color || '#0d9488', description || '', userId]
+    )
+
+    return success(res, { id: result.insertId }, '创建成功')
+
+  } catch (error) {
+    console.error('创建工程错误:', error)
+    return serverError(res, '创建工程失败')
+  }
+})
+
+/**
+ * 编辑工程
+ * PUT /api/v1/works/:id
+ */
+router.put('/works/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params
+    const {
+      workName,
+      workCode,
+      unitWork,
+      startDate,
+      endDate,
+      color,
+      description
+    } = req.body
+
+    // 查询工程
+    const works = await query(
+      'SELECT * FROM works WHERE id = ?',
+      [id]
+    )
+
+    if (works.length === 0) {
+      return notFound(res, '工程不存在')
+    }
+
+    // 如果修改了工程编号，检查是否重复
+    if (workCode && workCode !== works[0].work_code) {
+      const existing = await query(
+        'SELECT id FROM works WHERE work_code = ? AND id != ?',
+        [workCode, id]
+      )
+
+      if (existing.length > 0) {
+        return badRequest(res, '工程编号已存在')
+      }
+    }
+
+    // 更新工程
+    await query(
+      `UPDATE works SET 
+        work_name = COALESCE(?, work_name),
+        work_code = COALESCE(?, work_code),
+        unit_work = COALESCE(?, unit_work),
+        start_date = COALESCE(?, start_date),
+        end_date = COALESCE(?, end_date),
+        color = COALESCE(?, color),
+        description = COALESCE(?, description),
+        updated_at = NOW()
+      WHERE id = ?`,
+      [workName ?? null, workCode ?? null, unitWork ?? null, startDate ?? null, 
+       endDate ?? null, color ?? null, description ?? null, id]
+    )
+
+    return success(res, {}, '更新成功')
+
+  } catch (error) {
+    console.error('更新工程错误:', error)
+    return serverError(res, '更新工程失败')
+  }
+})
+
+/**
+ * 删除工程
+ * DELETE /api/v1/works/:id
+ */
+router.delete('/works/:id', authenticate, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    // 查询工程
+    const works = await query(
+      'SELECT * FROM works WHERE id = ?',
+      [id]
+    )
+
+    if (works.length === 0) {
+      return notFound(res, '工程不存在')
+    }
+
+    // 检查是否有关联的监理日志
+    const logs = await query(
+      'SELECT COUNT(*) as count FROM supervision_logs WHERE work_id = ?',
+      [id]
+    )
+
+    if (logs[0].count > 0) {
+      return badRequest(res, '该工程下存在监理日志，无法删除')
+    }
+
+    // 删除工程
+    await query('DELETE FROM works WHERE id = ?', [id])
+
+    return success(res, {}, '删除成功')
+
+  } catch (error) {
+    console.error('删除工程错误:', error)
+    return serverError(res, '删除工程失败')
+  }
+})
+
+module.exports = router
+
