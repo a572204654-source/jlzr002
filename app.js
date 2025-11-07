@@ -60,6 +60,47 @@ app.get('/health', (req, res) => {
   });
 });
 
+// 环境变量诊断接口（用于排查配置问题）
+app.get('/diagnose', (req, res) => {
+  const config = require('./config/index');
+  res.json({
+    timestamp: Date.now(),
+    environment: {
+      NODE_ENV: process.env.NODE_ENV || '(未设置)',
+      CLOUDBASE_ENV: process.env.CLOUDBASE_ENV || '(未设置)'
+    },
+    database: {
+      host: config.database.host,
+      port: config.database.port,
+      database: config.database.database,
+      user: config.database.user,
+      hasPassword: !!process.env.DB_PASSWORD,
+      envVars: {
+        DB_HOST_INTERNAL: process.env.DB_HOST_INTERNAL || '(未设置)',
+        DB_PORT_INTERNAL: process.env.DB_PORT_INTERNAL || '(未设置)',
+        DB_HOST_EXTERNAL: process.env.DB_HOST_EXTERNAL || '(未设置)',
+        DB_PORT_EXTERNAL: process.env.DB_PORT_EXTERNAL || '(未设置)',
+        DB_USER: process.env.DB_USER || '(未设置)',
+        DB_NAME: process.env.DB_NAME || '(未设置)'
+      }
+    },
+    wechat: {
+      hasAppId: !!process.env.WECHAT_APPID,
+      hasAppSecret: !!process.env.WECHAT_APPSECRET
+    },
+    diagnosis: {
+      isProduction: process.env.NODE_ENV === 'production',
+      shouldUseInternal: process.env.NODE_ENV === 'production',
+      hasInternalConfig: !!(process.env.DB_HOST_INTERNAL && process.env.DB_PORT_INTERNAL),
+      hasExternalConfig: !!(process.env.DB_HOST_EXTERNAL && process.env.DB_PORT_EXTERNAL),
+      isLocalhost: config.database.host === 'localhost' || config.database.host === '127.0.0.1',
+      warning: config.database.host === 'localhost' || config.database.host === '127.0.0.1' 
+        ? '❌ 数据库地址是本地地址，连接会失败！请检查环境变量配置。'
+        : null
+    }
+  });
+});
+
 
 // 404错误处理
 app.use(notFoundHandler);
