@@ -1,11 +1,39 @@
+# 依赖和日志
 node_modules
 npm-debug.log
+yarn-error.log
+*.log
+
+# 环境配置
 .env
+.env.*
+
+# Git 相关
 .git
 .gitignore
+.gitattributes
+
+# 文档
 README.md
+*.md
+docs/
+
+# IDE 配置
 .DS_Store
 .vscode
 .idea
-*.log
+*.swp
+*.swo
 
+# 测试文件
+test/
+api-tests/
+*.test.js
+test-*.js
+generate-*.js
+get-*.js
+
+# 临时文件
+*.tmp
+*.bak
+.cache

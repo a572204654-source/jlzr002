@@ -10,9 +10,10 @@ var http = require('http');
 
 /**
  * Get port from environment and store in Express.
+ * 云托管环境默认使用 80 端口
  */
 
-var port = normalizePort(process.env.PORT || '3000');
+var port = normalizePort(process.env.PORT || '80');
 app.set('port', port);
 
 /**
