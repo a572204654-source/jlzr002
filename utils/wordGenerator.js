@@ -27,7 +27,7 @@ async function generateSupervisionLogWord(logData) {
             text: '附录 11-5 表',
             alignment: AlignmentType.LEFT,
             spacing: {
-              after: 200
+              after: 400
             },
             children: [
               new TextRun({
@@ -38,35 +38,7 @@ async function generateSupervisionLogWord(logData) {
             ]
           }),
 
-          new Paragraph({
-            text: '',
-            spacing: { after: 400 }
-          }),
-
-          // 标题：监理日志
-          new Paragraph({
-            text: '监理日志',
-            alignment: AlignmentType.CENTER,
-            spacing: {
-              after: 800,
-              before: 400
-            },
-            children: [
-              new TextRun({
-                text: '监理日志',
-                size: 56,
-                bold: true,
-                font: '宋体'
-              })
-            ]
-          }),
-
-          new Paragraph({
-            text: '',
-            spacing: { after: 400 }
-          }),
-
-          // 封面信息表格
+          // 封面主表格（包含标题）
           new Table({
             width: {
               size: 100,
@@ -81,7 +53,7 @@ async function generateSupervisionLogWord(logData) {
               insideVertical: { style: BorderStyle.SINGLE, size: 1, color: '000000' }
             },
             rows: [
-              // 项目名称和项目编号
+              // 第1行：项目名称
               new TableRow({
                 height: { value: 600, rule: 'atLeast' },
                 children: [
@@ -99,7 +71,7 @@ async function generateSupervisionLogWord(logData) {
                 ]
               }),
 
-              // 项目编号（如果有）
+              // 第2行：项目编号
               new TableRow({
                 height: { value: 600, rule: 'atLeast' },
                 children: [
@@ -117,7 +89,7 @@ async function generateSupervisionLogWord(logData) {
                 ]
               }),
 
-              // 单项工程名称
+              // 第3行：单项工程名称和编号
               new TableRow({
                 height: { value: 600, rule: 'atLeast' },
                 children: [
@@ -144,7 +116,7 @@ async function generateSupervisionLogWord(logData) {
                 ]
               }),
 
-              // 单位工程名称和编号
+              // 第4行：单位工程名称和编号
               new TableRow({
                 height: { value: 600, rule: 'atLeast' },
                 children: [
@@ -171,15 +143,32 @@ async function generateSupervisionLogWord(logData) {
                 ]
               }),
 
-              // 空白区域（主表格内容）
+              // 第5行：空白区域 + "监理日志"大标题
               new TableRow({
-                height: { value: 8000, rule: 'atLeast' },
+                height: { value: 7000, rule: 'atLeast' },
                 children: [
                   new TableCell({
                     width: { size: 100, type: WidthType.PERCENTAGE },
-                    verticalAlign: VerticalAlign.TOP,
+                    verticalAlign: VerticalAlign.CENTER,
                     columnSpan: 4,
-                    children: [createLeftParagraph('')]
+                    children: [
+                      new Paragraph({
+                        text: '监理日志',
+                        alignment: AlignmentType.CENTER,
+                        spacing: {
+                          before: 2000,
+                          after: 2000
+                        },
+                        children: [
+                          new TextRun({
+                            text: '监理日志',
+                            size: 72,
+                            bold: true,
+                            font: '宋体'
+                          })
+                        ]
+                      })
+                    ]
                   })
                 ]
               })
@@ -191,12 +180,12 @@ async function generateSupervisionLogWord(logData) {
             spacing: { after: 400 }
           }),
 
-          // 底部信息
+          // 项目监理机构标题
           new Paragraph({
             text: '项目监理机构',
             alignment: AlignmentType.LEFT,
             spacing: {
-              after: 400,
+              after: 200,
               before: 200
             },
             children: [
@@ -255,7 +244,7 @@ async function generateSupervisionLogWord(logData) {
                     width: { size: 50, type: WidthType.PERCENTAGE },
                     verticalAlign: VerticalAlign.CENTER,
                     columnSpan: 2,
-                    children: [createCenteredParagraph('监理日志起止日期')]
+                    children: [createCenteredParagraph('监理日志起止时间')]
                   }),
                   new TableCell({
                     width: { size: 50, type: WidthType.PERCENTAGE },
