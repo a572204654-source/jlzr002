@@ -112,19 +112,39 @@ Page({
       return false
     }
 
+    // 如果已有连接，先关闭
+    if (this.socketTask) {
+      this.socketTask.close()
+      this.socketTask = null
+    }
+
+    // 清除之前的超时定时器
+    if (this.connectTimeout) {
+      clearTimeout(this.connectTimeout)
+      this.connectTimeout = null
+    }
+
     // 创建WebSocket连接
     // 注意：小程序WebSocket地址使用wss://而不是https://
     const wsUrl = apiUrl.replace('https://', 'wss://').replace('http://', 'ws://') + '/api/realtime-voice/stream'
     
     console.log('连接WebSocket:', wsUrl)
 
+    // 使用页面对象属性来跟踪连接状态
+    that.receivedWelcome = false
+    that.connectStartTime = Date.now()
+
     this.socketTask = wx.connectSocket({
       url: wsUrl,
       success: () => {
-        console.log('WebSocket连接成功')
+        console.log('WebSocket连接请求已发送')
       },
       fail: (err) => {
         console.error('WebSocket连接失败', err)
+        if (that.connectTimeout) {
+          clearTimeout(that.connectTimeout)
+          that.connectTimeout = null
+        }
         wx.showToast({
           title: '连接失败',
           icon: 'none'
@@ -134,26 +154,37 @@ Page({
 
     // 监听WebSocket连接打开
     this.socketTask.onOpen(() => {
-      console.log('WebSocket已打开')
-      that.setData({
-        isConnected: true
-      })
-
-      // 发送初始化消息
-      that.socketTask.send({
-        data: JSON.stringify({
-          type: 'start',
-          userId: userInfo.id,
-          token: token,
-          engineType: that.data.engineType,
-          voiceFormat: that.data.voiceFormat,
-          needvad: that.data.needvad,
-          filterDirty: that.data.filterDirty,
-          filterModal: that.data.filterModal,
-          convertNumMode: that.data.convertNumMode,
-          wordInfo: that.data.wordInfo
-        })
-      })
+      console.log('WebSocket已打开，等待欢迎消息...')
+      
+      // 设置超时检测：15秒内必须收到欢迎消息
+      that.connectTimeout = setTimeout(() => {
+        if (!that.receivedWelcome) {
+          const totalTime = Date.now() - that.connectStartTime
+          console.error('❌ WebSocket连接超时（15秒未建立连接）')
+          console.error('连接状态:', {
+            '已连接': that.data.isConnected,
+            '总耗时': `${totalTime}ms`,
+            '连接地址': wsUrl,
+            '网络类型': 'wifi',
+            'socketTask状态': that.socketTask ? 'exists' : 'null',
+            'WebSocket状态': 'OPEN'
+          })
+          
+          if (that.socketTask) {
+            that.socketTask.close()
+            that.socketTask = null
+          }
+          
+          that.setData({
+            isConnected: false
+          })
+          
+          wx.showToast({
+            title: '连接超时',
+            icon: 'none'
+          })
+        }
+      }, 15000)
     })
 
     // 监听WebSocket消息
@@ -161,6 +192,43 @@ Page({
       console.log('收到消息:', res.data)
       try {
         const message = JSON.parse(res.data)
+        
+        // 处理欢迎消息，确认连接成功
+        if (message.type === 'welcome') {
+          that.receivedWelcome = true
+          console.log('✅ 收到欢迎消息，连接已确认')
+          
+          // 清除超时定时器
+          if (that.connectTimeout) {
+            clearTimeout(that.connectTimeout)
+            that.connectTimeout = null
+          }
+          
+          // 设置连接状态
+          that.setData({
+            isConnected: true
+          })
+          
+          // 发送初始化消息
+          that.socketTask.send({
+            data: JSON.stringify({
+              type: 'start',
+              userId: userInfo.id,
+              token: token,
+              engineType: that.data.engineType,
+              voiceFormat: that.data.voiceFormat,
+              needvad: that.data.needvad,
+              filterDirty: that.data.filterDirty,
+              filterModal: that.data.filterModal,
+              convertNumMode: that.data.convertNumMode,
+              wordInfo: that.data.wordInfo
+            })
+          })
+          
+          return
+        }
+        
+        // 处理其他消息
         that.handleWebSocketMessage(message)
       } catch (err) {
         console.error('解析消息失败', err)
@@ -170,6 +238,13 @@ Page({
     // 监听WebSocket错误
     this.socketTask.onError((err) => {
       console.error('WebSocket错误', err)
+      
+      // 清除超时定时器
+      if (that.connectTimeout) {
+        clearTimeout(that.connectTimeout)
+        that.connectTimeout = null
+      }
+      
       that.setData({
         isConnected: false
       })
@@ -182,6 +257,13 @@ Page({
     // 监听WebSocket关闭
     this.socketTask.onClose(() => {
       console.log('WebSocket已关闭')
+      
+      // 清除超时定时器
+      if (that.connectTimeout) {
+        clearTimeout(that.connectTimeout)
+        that.connectTimeout = null
+      }
+      
       that.setData({
         isConnected: false
       })
@@ -197,6 +279,11 @@ Page({
     console.log('处理消息:', message.type)
 
     switch (message.type) {
+      case 'welcome':
+        // 欢迎消息已在 onMessage 中处理，这里不需要再处理
+        console.log('收到欢迎消息')
+        break
+
       case 'ready':
         console.log('识别服务就绪')
         this.setData({

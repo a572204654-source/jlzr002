@@ -158,6 +158,13 @@ function initWebSocketRoutes() {
   router.ws('/stream', (ws, req) => {
     console.log('WebSocket客户端已连接:', req.url)
 
+    // 连接建立时立即发送欢迎消息，让客户端确认连接成功
+    ws.send(JSON.stringify({
+      type: 'welcome',
+      message: 'WebSocket连接成功！',
+      timestamp: Date.now()
+    }))
+
     let recognition = null
     let userId = null
     let voiceLogId = null
