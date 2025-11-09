@@ -27,6 +27,9 @@ var voiceRecognitionRouter = require('./routes/voice-recognition');
 // 实时语音识别路由（新版本，WebSocket流式）
 var realtimeVoiceRouter = require('./routes/realtime-voice');
 
+// 实时语音识别路由（Socket.IO版本，用于微信云托管）
+const { router: realtimeVoiceSocketIORouter, initSocketIO } = require('./routes/realtime-voice-socketio');
+
 // 中间件
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 
@@ -77,12 +80,48 @@ app.use('/api/voice-recognition', voiceRecognitionRouter);
 // 实时语音识别API路由（新版本，WebSocket流式）
 app.use('/api/realtime-voice', realtimeVoiceRouter);
 
+// 实时语音识别API路由（Socket.IO版本，用于微信云托管）
+app.use('/api/realtime-voice-socketio', realtimeVoiceSocketIORouter);
+
+// 初始化 Socket.IO（从 bin/www 中获取 io 实例）
+// 这个函数会在服务器启动后被调用
+app.initSocketIO = function() {
+  const io = app.get('io');
+  if (io) {
+    initSocketIO(io);
+    console.log('Socket.IO 实时语音识别已初始化');
+  }
+};
+
 // 健康检查接口（用于云托管健康检测）
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: Date.now(),
     service: 'express-miniapp'
+  });
+});
+
+// WebSocket 测试接口
+app.ws('/test-ws', (ws, req) => {
+  console.log('✅ WebSocket 测试连接成功');
+  ws.send(JSON.stringify({ 
+    type: 'connected', 
+    message: 'WebSocket 工作正常',
+    timestamp: Date.now()
+  }));
+  
+  ws.on('message', (msg) => {
+    console.log('收到测试消息:', msg.toString());
+    ws.send(JSON.stringify({ 
+      type: 'echo', 
+      data: msg.toString(),
+      timestamp: Date.now()
+    }));
+  });
+  
+  ws.on('close', () => {
+    console.log('WebSocket 测试连接已关闭');
   });
 });
 

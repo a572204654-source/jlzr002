@@ -5,8 +5,7 @@ const { success, badRequest, serverError } = require('../utils/response')
 const { query } = require('../config/database')
 const { authenticate } = require('../middleware/auth')
 const { getVoiceRecognitionService } = require('../utils/voiceRecognition')
-
-// 注意：WebSocket 支持已在 app.js 中启用，这里不需要重复调用
+const { verifyToken } = require('../utils/jwt')
 
 // 配置文件上传（使用内存存储）
 const upload = multer({
@@ -73,54 +72,59 @@ router.post('/recognize', authenticate, upload.single('audio'), async (req, res)
 })
 
 /**
- * 实时语音识别（WebSocket流式）
- * WS /api/realtime-voice/stream
- * 
- * 用于长时间实时语音输入，支持边说边识别
- * 客户端需要持续发送音频数据帧
+ * 初始化 Socket.IO 实时语音识别
+ * 在 app.js 中调用此函数来设置 Socket.IO 事件处理
  */
-router.ws('/stream', (ws, req) => {
-  console.log('WebSocket客户端已连接')
+function initSocketIO(io) {
+  console.log('正在初始化 Socket.IO 实时语音识别服务...')
 
-  let recognition = null
-  let userId = null
-  let voiceLogId = null
-  let recognizedText = ''
-  let audioSize = 0
-  let startTime = Date.now()
+  // 创建命名空间
+  const voiceNamespace = io.of('/realtime-voice')
 
-  // 接收客户端消息
-  ws.on('message', async (msg) => {
-    try {
-      const message = JSON.parse(msg.toString())
-      console.log('收到客户端消息:', message.type)
+  voiceNamespace.on('connection', (socket) => {
+    console.log('Socket.IO 客户端已连接:', socket.id)
 
-      // 初始化识别
-      if (message.type === 'start') {
-        userId = message.userId
-        const token = message.token
+    let recognition = null
+    let userId = null
+    let voiceLogId = null
+    let recognizedText = ''
+    let audioSize = 0
+    let startTime = Date.now()
 
-        // TODO: 验证token和userId
-        // 简化处理，实际应该验证token
-        if (!userId || !token) {
-          ws.send(JSON.stringify({
-            type: 'error',
-            message: '缺少认证信息'
-          }))
-          ws.close()
+    // 监听客户端的 'start' 事件
+    socket.on('start', async (data) => {
+      try {
+        console.log('收到 start 事件:', data)
+
+        // 验证 token
+        const token = data.token
+        if (!token) {
+          socket.emit('error', { message: '缺少认证信息' })
+          socket.disconnect()
+          return
+        }
+
+        // 验证并解析 token
+        try {
+          const decoded = verifyToken(token)
+          userId = decoded.userId
+        } catch (err) {
+          console.error('Token 验证失败:', err)
+          socket.emit('error', { message: 'Token 无效或已过期' })
+          socket.disconnect()
           return
         }
 
         // 获取识别选项
         const options = {
-          engineType: message.engineType || '16k_zh',
-          voiceFormat: message.voiceFormat || 1,
-          needvad: message.needvad !== undefined ? message.needvad : 1,
-          filterDirty: message.filterDirty || 0,
-          filterModal: message.filterModal || 0,
-          convertNumMode: message.convertNumMode || 1,
-          wordInfo: message.wordInfo || 2,
-          vadSilenceTime: message.vadSilenceTime || 200
+          engineType: data.engineType || '16k_zh',
+          voiceFormat: data.voiceFormat || 1,
+          needvad: data.needvad !== undefined ? data.needvad : 1,
+          filterDirty: data.filterDirty || 0,
+          filterModal: data.filterModal || 0,
+          convertNumMode: data.convertNumMode || 1,
+          wordInfo: data.wordInfo || 2,
+          vadSilenceTime: data.vadSilenceTime || 200
         }
 
         console.log('开始实时识别，用户ID:', userId, '选项:', options)
@@ -136,13 +140,12 @@ router.ws('/stream', (ws, req) => {
             recognizedText = result.text
 
             // 发送识别结果到客户端
-            ws.send(JSON.stringify({
-              type: 'result',
+            socket.emit('result', {
               voiceId: result.voiceId,
               text: result.text,
               isFinal: result.isFinal,
               wordList: result.wordList
-            }))
+            })
 
             // 如果是最终结果，保存到数据库
             if (result.isFinal && userId) {
@@ -159,84 +162,87 @@ router.ws('/stream', (ws, req) => {
           // 错误回调
           (error) => {
             console.error('识别错误:', error)
-            ws.send(JSON.stringify({
-              type: 'error',
+            socket.emit('error', {
               message: error.message || '识别失败'
-            }))
+            })
           }
         )
 
         // 发送就绪消息
-        ws.send(JSON.stringify({
-          type: 'ready',
+        socket.emit('ready', {
           message: '识别服务已就绪'
-        }))
+        })
+
+      } catch (error) {
+        console.error('处理 start 事件错误:', error)
+        socket.emit('error', {
+          message: error.message || '初始化失败'
+        })
       }
-      // 发送音频数据
-      else if (message.type === 'audio') {
+    })
+
+    // 监听客户端的 'audio' 事件
+    socket.on('audio', (data) => {
+      try {
         if (!recognition) {
-          ws.send(JSON.stringify({
-            type: 'error',
-            message: '识别服务未初始化'
-          }))
+          socket.emit('error', { message: '识别服务未初始化' })
           return
         }
 
         // 解码Base64音频数据
-        const audioData = Buffer.from(message.data, 'base64')
+        const audioData = Buffer.from(data.data, 'base64')
         audioSize += audioData.length
 
         // 发送到腾讯云
-        recognition.send(audioData, message.isEnd || false)
+        recognition.send(audioData, data.isEnd || false)
 
         // 如果是最后一帧，发送完成消息
-        if (message.isEnd) {
+        if (data.isEnd) {
           console.log('音频发送完成，总大小:', audioSize)
         }
+      } catch (error) {
+        console.error('处理 audio 事件错误:', error)
+        socket.emit('error', {
+          message: error.message || '处理音频失败'
+        })
       }
-      // 停止识别
-      else if (message.type === 'stop') {
+    })
+
+    // 监听客户端的 'stop' 事件
+    socket.on('stop', () => {
+      try {
         if (recognition) {
           recognition.close()
           recognition = null
         }
 
-        ws.send(JSON.stringify({
-          type: 'stopped',
+        socket.emit('stopped', {
           message: '识别已停止',
           logId: voiceLogId,
           text: recognizedText,
           audioSize: audioSize,
           duration: Date.now() - startTime
-        }))
+        })
+      } catch (error) {
+        console.error('处理 stop 事件错误:', error)
+        socket.emit('error', {
+          message: error.message || '停止失败'
+        })
       }
-    } catch (error) {
-      console.error('处理WebSocket消息错误:', error)
-      ws.send(JSON.stringify({
-        type: 'error',
-        message: error.message || '处理消息失败'
-      }))
-    }
+    })
+
+    // 监听断开连接
+    socket.on('disconnect', () => {
+      console.log('Socket.IO 客户端已断开:', socket.id)
+      if (recognition) {
+        recognition.close()
+        recognition = null
+      }
+    })
   })
 
-  // 连接关闭
-  ws.on('close', () => {
-    console.log('WebSocket客户端已断开')
-    if (recognition) {
-      recognition.close()
-      recognition = null
-    }
-  })
-
-  // 连接错误
-  ws.on('error', (error) => {
-    console.error('WebSocket错误:', error)
-    if (recognition) {
-      recognition.close()
-      recognition = null
-    }
-  })
-})
+  console.log('Socket.IO 实时语音识别服务初始化完成')
+}
 
 /**
  * 保存识别记录到数据库
@@ -378,5 +384,9 @@ router.get('/stats', authenticate, async (req, res) => {
   }
 })
 
-module.exports = router
+// 导出路由和初始化函数
+module.exports = {
+  router,
+  initSocketIO
+}
 

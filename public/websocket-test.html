@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket 连接测试</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .input-group input,
+        .input-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus,
+        .input-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #d32f2f;
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .status {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-disconnected {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ef9a9a;
+        }
+
+        .status-connecting {
+            background: #fff3e0;
+            color: #e65100;
+            border: 1px solid #ffcc80;
+        }
+
+        .status-connected {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #a5d6a7;
+        }
+
+        .status-icon {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-disconnected .status-icon {
+            background: #c62828;
+        }
+
+        .status-connecting .status-icon {
+            background: #e65100;
+        }
+
+        .status-connected .status-icon {
+            background: #2e7d32;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .log-container {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 6px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 4px 0;
+        }
+
+        .log-time {
+            color: #858585;
+            margin-right: 8px;
+        }
+
+        .log-info {
+            color: #4fc3f7;
+        }
+
+        .log-success {
+            color: #66bb6a;
+        }
+
+        .log-error {
+            color: #ef5350;
+        }
+
+        .log-warning {
+            color: #ffa726;
+        }
+
+        .message-input {
+            margin-bottom: 15px;
+        }
+
+        .message-input textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .message-input textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .quick-messages {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        .quick-message-btn {
+            padding: 8px 16px;
+            background: #f5f5f5;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .quick-message-btn:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+            font-size: 12px;
+            border-top: 1px solid #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔌 WebSocket 连接测试</h1>
+            <p>测试云托管环境的 WebSocket 连接</p>
+        </div>
+
+        <div class="content">
+            <!-- 连接配置 -->
+            <div class="section">
+                <div class="section-title">连接配置</div>
+                
+                <div class="input-group">
+                    <label>选择测试地址</label>
+                    <select id="urlSelect">
+                        <option value="wss://api.yimengpl.com/test-ws">自定义域名 - wss://api.yimengpl.com/test-ws</option>
+                        <option value="wss://jlzr1101-5g9kplxza13a780d-1302271970.ap-shanghai.app.tcloudbase.com/test-ws">默认域名 (ap-shanghai)</option>
+                        <option value="wss://jlzr1101-5g9kplxza13a780d-1302271970.tcloudbaseapp.com/test-ws">默认域名 (tcloudbaseapp)</option>
+                        <option value="custom">自定义地址...</option>
+                    </select>
+                </div>
+
+                <div class="input-group" id="customUrlGroup" style="display: none;">
+                    <label>自定义 WebSocket 地址</label>
+                    <input type="text" id="customUrl" placeholder="wss://your-domain.com/path">
+                </div>
+
+                <div id="statusDisplay" class="status status-disconnected">
+                    <div class="status-icon"></div>
+                    <span>未连接</span>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn btn-primary" id="connectBtn">连接</button>
+                    <button class="btn btn-danger" id="disconnectBtn" disabled>断开</button>
+                    <button class="btn btn-secondary" id="clearLogBtn">清空日志</button>
+                </div>
+            </div>
+
+            <!-- 消息发送 -->
+            <div class="section">
+                <div class="section-title">发送消息</div>
+                
+                <div class="quick-messages">
+                    <button class="quick-message-btn" data-message='{"type":"ping"}'>Ping</button>
+                    <button class="quick-message-btn" data-message='{"type":"test","message":"测试消息"}'>测试消息</button>
+                    <button class="quick-message-btn" data-message='{"type":"echo","data":"Hello WebSocket"}'>Echo</button>
+                    <button class="quick-message-btn" data-message='{"type":"info"}'>获取信息</button>
+                </div>
+
+                <div class="message-input">
+                    <textarea id="messageInput" placeholder='输入 JSON 消息，例如：{"type":"ping","message":"测试"}'></textarea>
+                </div>
+
+                <button class="btn btn-primary" id="sendBtn" disabled>发送消息</button>
+            </div>
+
+            <!-- 日志输出 -->
+            <div class="section">
+                <div class="section-title">连接日志</div>
+                <div class="log-container" id="logContainer">
+                    <div class="log-entry log-info">
+                        <span class="log-time">[系统]</span>
+                        <span>准备就绪，请点击"连接"按钮开始测试</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            WebSocket 测试工具 v1.0 | 云托管环境：jlzr1101-5g9kplxza13a780d
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let isConnected = false;
+
+        const urlSelect = document.getElementById('urlSelect');
+        const customUrlGroup = document.getElementById('customUrlGroup');
+        const customUrl = document.getElementById('customUrl');
+        const statusDisplay = document.getElementById('statusDisplay');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const clearLogBtn = document.getElementById('clearLogBtn');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const logContainer = document.getElementById('logContainer');
+
+        // URL 选择变化
+        urlSelect.addEventListener('change', () => {
+            if (urlSelect.value === 'custom') {
+                customUrlGroup.style.display = 'block';
+            } else {
+                customUrlGroup.style.display = 'none';
+            }
+        });
+
+        // 连接按钮
+        connectBtn.addEventListener('click', () => {
+            const url = urlSelect.value === 'custom' ? customUrl.value : urlSelect.value;
+            if (!url) {
+                addLog('error', '请输入 WebSocket 地址');
+                return;
+            }
+            connect(url);
+        });
+
+        // 断开按钮
+        disconnectBtn.addEventListener('click', () => {
+            disconnect();
+        });
+
+        // 清空日志
+        clearLogBtn.addEventListener('click', () => {
+            logContainer.innerHTML = '';
+            addLog('info', '日志已清空');
+        });
+
+        // 发送消息
+        sendBtn.addEventListener('click', () => {
+            sendMessage();
+        });
+
+        // 快捷消息按钮
+        document.querySelectorAll('.quick-message-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const message = btn.getAttribute('data-message');
+                messageInput.value = message;
+                if (isConnected) {
+                    sendMessage();
+                }
+            });
+        });
+
+        // 连接 WebSocket
+        function connect(url) {
+            addLog('info', `正在连接: ${url}`);
+            updateStatus('connecting', '连接中...');
+            connectBtn.disabled = true;
+
+            try {
+                ws = new WebSocket(url);
+
+                ws.onopen = () => {
+                    isConnected = true;
+                    addLog('success', '✅ WebSocket 连接成功!');
+                    updateStatus('connected', '已连接');
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                    sendBtn.disabled = false;
+                };
+
+                ws.onmessage = (event) => {
+                    addLog('success', `📥 收到消息: ${event.data}`);
+                    try {
+                        const data = JSON.parse(event.data);
+                        addLog('info', `📋 解析后: ${JSON.stringify(data, null, 2)}`);
+                    } catch (e) {
+                        addLog('warning', '⚠️ 无法解析为 JSON');
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    addLog('error', `❌ 连接错误: ${error.message || '未知错误'}`);
+                    updateStatus('disconnected', '连接失败');
+                };
+
+                ws.onclose = (event) => {
+                    isConnected = false;
+                    addLog('warning', `🔌 连接已关闭 (代码: ${event.code}, 原因: ${event.reason || '无'})`);
+                    updateStatus('disconnected', '未连接');
+                    connectBtn.disabled = false;
+                    disconnectBtn.disabled = true;
+                    sendBtn.disabled = true;
+                };
+
+            } catch (error) {
+                addLog('error', `❌ 创建连接失败: ${error.message}`);
+                updateStatus('disconnected', '连接失败');
+                connectBtn.disabled = false;
+            }
+        }
+
+        // 断开连接
+        function disconnect() {
+            if (ws) {
+                addLog('info', '正在断开连接...');
+                ws.close();
+                ws = null;
+            }
+        }
+
+        // 发送消息
+        function sendMessage() {
+            if (!isConnected || !ws) {
+                addLog('error', '❌ 未连接到 WebSocket');
+                return;
+            }
+
+            const message = messageInput.value.trim();
+            if (!message) {
+                addLog('error', '❌ 消息不能为空');
+                return;
+            }
+
+            try {
+                // 验证 JSON 格式
+                JSON.parse(message);
+                ws.send(message);
+                addLog('info', `📤 发送消息: ${message}`);
+            } catch (e) {
+                addLog('error', `❌ 无效的 JSON 格式: ${e.message}`);
+            }
+        }
+
+        // 更新状态
+        function updateStatus(status, text) {
+            statusDisplay.className = `status status-${status}`;
+            statusDisplay.innerHTML = `
+                <div class="status-icon"></div>
+                <span>${text}</span>
+            `;
+        }
+
+        // 添加日志
+        function addLog(type, message) {
+            const time = new Date().toLocaleTimeString('zh-CN');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.innerHTML = `
+                <span class="log-time">[${time}]</span>
+                <span>${message}</span>
+            `;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // 回车发送
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
+

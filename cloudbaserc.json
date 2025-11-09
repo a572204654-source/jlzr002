@@ -1,21 +1,24 @@
 {
-  "envId": "cloud1-5gtce4ym5a28e1b9",
+  "envId": "jlzr1101-5g9kplxza13a780d",
   "version": "2.0",
   "$schema": "https://framework-1258016615.tcloudbaseapp.com/schema/latest.json",
   "framework": {
-    "name": "supervision-log-api",
+    "name": "node-backend",
     "plugins": {
       "container": {
         "use": "@cloudbase/framework-plugin-container",
         "inputs": {
-          "serviceName": "supervision-log-api",
+          "serviceName": "node-backend",
           "servicePath": "/",
           "containerPort": 80,
           "dockerfilePath": "./Dockerfile",
-          "buildDir": "."
+          "buildDir": ".",
+          "enableWebSocket": true
         }
       }
     }
+  },
+  "cloudrun": {
+    "name": "node-backend"
   }
 }
-

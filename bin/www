@@ -23,6 +23,29 @@ app.set('port', port);
 var server = http.createServer(app);
 
 /**
+ * 初始化 Socket.IO
+ */
+const { Server } = require('socket.io');
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  },
+  path: '/socket.io/',
+  transports: ['websocket', 'polling']
+});
+
+// 将 io 实例挂载到 app 上，供路由使用
+app.set('io', io);
+
+console.log('Socket.IO 服务器已初始化');
+
+// 初始化 Socket.IO 路由处理
+if (app.initSocketIO) {
+  app.initSocketIO();
+}
+
+/**
  * Listen on provided port, on all network interfaces.
  */
 
