@@ -18,10 +18,23 @@ const upload = multer({
 })
 
 /**
- * 一句话识别（快速识别短语音）
+ * 实时语音识别（上传音频文件）
  * POST /api/realtime-voice/recognize
  * 
- * 适用于60秒以内的短语音，直接上传完整音频文件
+ * 使用实时语音识别接口（WebSocket流式）识别上传的音频文件
+ * 将音频文件分块发送到实时识别服务，模拟实时流
+ * 
+ * 请求参数:
+ * - audio: 音频文件（multipart/form-data）
+ * - engineType: 识别引擎类型（可选，默认16k_zh）
+ * - voiceFormat: 音频格式（可选，1:pcm 4:wav 6:mp3）
+ * - needvad: 是否需要VAD（可选，0或1，默认1）
+ * - filterDirty: 是否过滤脏词（可选，0或1）
+ * - filterModal: 是否过滤语气词（可选，0或1）
+ * - filterPunc: 是否过滤标点（可选，0或1）
+ * - convertNumMode: 是否转换数字（可选，0或1）
+ * - wordInfo: 词级别时间戳（可选，0-2，默认2）
+ * - vadSilenceTime: VAD静音检测时间(ms)（可选，默认200）
  */
 router.post('/recognize', authenticate, upload.single('audio'), async (req, res) => {
   try {
@@ -34,7 +47,7 @@ router.post('/recognize', authenticate, upload.single('audio'), async (req, res)
     const audioBuffer = req.file.buffer
     const audioSize = req.file.size
 
-    console.log('收到一句话识别请求:', {
+    console.log('收到实时语音识别请求:', {
       userId,
       fileName: req.file.originalname,
       size: audioSize
@@ -43,14 +56,18 @@ router.post('/recognize', authenticate, upload.single('audio'), async (req, res)
     // 获取识别选项
     const options = {
       engineType: req.body.engineType || '16k_zh',
+      voiceFormat: parseInt(req.body.voiceFormat) || 1,
+      needvad: parseInt(req.body.needvad) !== undefined ? parseInt(req.body.needvad) : 1,
       filterDirty: parseInt(req.body.filterDirty) || 0,
       filterModal: parseInt(req.body.filterModal) || 0,
+      filterPunc: parseInt(req.body.filterPunc) || 0,
       convertNumMode: parseInt(req.body.convertNumMode) || 1,
-      wordInfo: parseInt(req.body.wordInfo) || 2
+      wordInfo: parseInt(req.body.wordInfo) || 2,
+      vadSilenceTime: parseInt(req.body.vadSilenceTime) || 200
     }
 
     const voiceService = getVoiceRecognitionService()
-    const result = await voiceService.recognizeFile(audioBuffer, options)
+    const result = await voiceService.recognizeFileWithRealtime(audioBuffer, options)
 
     // 保存识别记录
     const insertResult = await query(
@@ -64,11 +81,11 @@ router.post('/recognize', authenticate, upload.single('audio'), async (req, res)
       id: insertResult.insertId,
       text: result.text,
       audioTime: result.audioTime,
-      requestId: result.requestId
+      wordList: result.wordList || []
     }, '识别成功')
 
   } catch (error) {
-    console.error('一句话识别错误:', error)
+    console.error('实时语音识别错误:', error)
     return serverError(res, error.message || '语音识别失败')
   }
 })

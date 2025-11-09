@@ -38,11 +38,20 @@ const upload = multer({
  * 实时语音识别（上传音频文件）
  * POST /api/voice-recognition/realtime
  * 
+ * 使用实时语音识别接口（WebSocket流式）识别上传的音频文件
+ * 将音频文件分块发送到实时识别服务，模拟实时流
+ * 
  * 请求参数:
  * - audio: 音频文件（multipart/form-data）
  * - engineType: 识别引擎类型（可选，默认16k_zh）
+ * - voiceFormat: 音频格式（可选，1:pcm 4:wav 6:mp3）
+ * - needvad: 是否需要VAD（可选，0或1，默认1）
  * - filterDirty: 是否过滤脏词（可选，0或1）
+ * - filterModal: 是否过滤语气词（可选，0或1）
+ * - filterPunc: 是否过滤标点（可选，0或1）
  * - convertNumMode: 是否转换数字（可选，0或1）
+ * - wordInfo: 词级别时间戳（可选，0-2，默认2）
+ * - vadSilenceTime: VAD静音检测时间(ms)（可选，默认200）
  */
 router.post('/realtime', authenticate, upload.single('audio'), async (req, res) => {
   try {
@@ -56,7 +65,7 @@ router.post('/realtime', authenticate, upload.single('audio'), async (req, res) 
     const audioBuffer = req.file.buffer
     const audioSize = req.file.size
 
-    console.log('收到语音识别请求:', {
+    console.log('收到实时语音识别请求:', {
       userId,
       fileName: req.file.originalname,
       mimeType: req.file.mimetype,
@@ -66,27 +75,31 @@ router.post('/realtime', authenticate, upload.single('audio'), async (req, res) 
     // 获取识别选项
     const options = {
       engineType: req.body.engineType || '16k_zh',
+      voiceFormat: parseInt(req.body.voiceFormat) || 1,
+      needvad: parseInt(req.body.needvad) !== undefined ? parseInt(req.body.needvad) : 1,
       filterDirty: parseInt(req.body.filterDirty) || 0,
       filterModal: parseInt(req.body.filterModal) || 0,
       filterPunc: parseInt(req.body.filterPunc) || 0,
       convertNumMode: parseInt(req.body.convertNumMode) || 1,
-      wordInfo: parseInt(req.body.wordInfo) || 2
+      wordInfo: parseInt(req.body.wordInfo) || 2,
+      vadSilenceTime: parseInt(req.body.vadSilenceTime) || 200
     }
 
-    // 调用语音识别服务
+    // 调用实时语音识别服务
     const voiceService = getVoiceRecognitionService()
-    const result = await voiceService.recognizeFile(audioBuffer, options)
+    const result = await voiceService.recognizeFileWithRealtime(audioBuffer, options)
 
     // 保存识别记录到数据库
     const insertResult = await query(
       `INSERT INTO voice_recognition_logs 
-        (user_id, audio_size, recognized_text, audio_time, options, created_at) 
-       VALUES (?, ?, ?, ?, ?, NOW())`,
+        (user_id, audio_size, recognized_text, audio_time, recognition_type, options, created_at) 
+       VALUES (?, ?, ?, ?, ?, ?, NOW())`,
       [
         userId,
         audioSize,
         result.text || '',
         result.audioTime || 0,
+        'realtime',
         JSON.stringify(options)
       ]
     )
@@ -95,7 +108,7 @@ router.post('/realtime', authenticate, upload.single('audio'), async (req, res) 
       id: insertResult.insertId,
       text: result.text,
       audioTime: result.audioTime,
-      requestId: result.requestId
+      wordList: result.wordList || []
     }, '识别成功')
 
   } catch (error) {

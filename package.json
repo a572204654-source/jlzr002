@@ -15,7 +15,8 @@
     "verify-quick": "node test/quick-verify.js",
     "verify-interactive": "node test/interactive-verify.js",
     "setup-voice": "node scripts/setup-voice-recognition.js",
-    "test-voice": "node test/voice-recognition-test.js"
+    "test-voice": "node test/voice-recognition-test.js",
+    "diagnose-signature": "node test/diagnose-signature-issue.js"
   },
   "dependencies": {
     "@cloudbase/node-sdk": "^3.14.1",

@@ -16,6 +16,16 @@ class VoiceRecognitionService {
     this.appId = config.tencentCloud.appId
     this.region = config.tencentCloud.region || 'ap-guangzhou'
     
+    // 验证密钥配置
+    if (!this.secretId || !this.secretKey) {
+      throw new Error('腾讯云 SecretId 或 SecretKey 未配置，请检查环境变量 TENCENTCLOUD_SECRET_ID 和 TENCENTCLOUD_SECRET_KEY')
+    }
+    
+    // 验证 SecretKey 格式（通常为40个字符）
+    if (this.secretKey.length < 32) {
+      console.warn('警告: SecretKey 长度异常，可能导致签名验证失败')
+    }
+    
     // WebSocket实时识别配置
     this.wsHost = 'asr.cloud.tencent.com'
     this.wsPath = '/asr/v2/'
@@ -25,6 +35,34 @@ class VoiceRecognitionService {
     this.service = 'asr'
     this.version = '2019-06-14'
     this.algorithm = 'TC3-HMAC-SHA256'
+    
+    // 代理配置（如果设置了环境变量）
+    this.proxy = process.env.HTTP_PROXY || process.env.http_proxy || null
+    this.httpsProxy = process.env.HTTPS_PROXY || process.env.https_proxy || null
+  }
+  
+  /**
+   * 获取 UTC 时间戳（秒）
+   * 确保使用 UTC 时区，避免时区问题导致签名错误
+   */
+  getUTCTimestamp() {
+    // Date.now() 返回的是 UTC 时间戳（毫秒），除以1000得到秒
+    // 为了确保一致性，使用 Math.floor 向下取整
+    return Math.floor(Date.now() / 1000)
+  }
+  
+  /**
+   * 获取 UTC 日期字符串（YYYY-MM-DD）
+   * 用于签名中的 credential scope
+   */
+  getUTCDateString(timestamp) {
+    // 使用 UTC 时间戳创建 Date 对象
+    const date = new Date(timestamp * 1000)
+    // 使用 UTC 方法获取年月日，确保时区正确
+    const year = date.getUTCFullYear()
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+    const day = String(date.getUTCDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
   }
 
   /**
@@ -50,13 +88,14 @@ class VoiceRecognitionService {
    * 生成腾讯云API签名（用于一句话识别）
    * 参考文档: https://cloud.tencent.com/document/api/598/38504
    * @param {Object} payload - 请求体数据
-   * @param {Number} timestamp - 时间戳（秒）
+   * @param {Number} timestamp - 时间戳（秒，必须是 UTC 时间戳）
    * @param {String} action - API动作名称
    * @returns {String} Authorization 字符串
    */
   generateSignature(payload, timestamp, action) {
     try {
-      const date = new Date(timestamp * 1000).toISOString().split('T')[0]
+      // 使用 UTC 时区获取日期字符串，确保时区正确
+      const date = this.getUTCDateString(timestamp)
       
       // 1. 拼接规范请求串
       const httpRequestMethod = 'POST'
@@ -151,10 +190,12 @@ class VoiceRecognitionService {
    */
   async callApi(action, payload) {
     try {
-      const timestamp = Math.floor(Date.now() / 1000)
+      // 使用 UTC 时间戳，确保时区正确
+      const timestamp = this.getUTCTimestamp()
       const authorization = this.generateSignature(payload, timestamp, action)
 
-      const response = await axios({
+      // 配置 axios 请求选项
+      const axiosConfig = {
         method: 'POST',
         url: `https://${this.host}`,
         headers: {
@@ -168,7 +209,26 @@ class VoiceRecognitionService {
         },
         data: payload,
         timeout: 30000
-      })
+      }
+      
+      // 如果配置了代理，添加代理设置（可选功能）
+      if (this.httpsProxy || this.proxy) {
+        try {
+          const HttpsProxyAgent = require('https-proxy-agent')
+          const HttpProxyAgent = require('http-proxy-agent')
+          const proxyUrl = this.httpsProxy || this.proxy
+          
+          if (proxyUrl && (proxyUrl.startsWith('https://') || proxyUrl.startsWith('http://'))) {
+            axiosConfig.httpsAgent = new HttpsProxyAgent(proxyUrl)
+            axiosConfig.httpAgent = new HttpProxyAgent(proxyUrl)
+            console.log('使用代理:', proxyUrl.replace(/:[^:@]+@/, ':****@'))
+          }
+        } catch (error) {
+          console.warn('代理配置失败，将直接连接（如需使用代理，请安装: npm install https-proxy-agent http-proxy-agent）:', error.message)
+        }
+      }
+
+      const response = await axios(axiosConfig)
 
       if (response.data.Response && response.data.Response.Error) {
         throw new Error(response.data.Response.Error.Message)
@@ -214,7 +274,8 @@ class VoiceRecognitionService {
         vadSilenceTime = 200 // VAD静音检测时间(ms)
       } = options
 
-      const timestamp = Math.floor(Date.now() / 1000)
+      // 使用 UTC 时间戳，确保时区正确
+      const timestamp = this.getUTCTimestamp()
       const signature = this.generateWebSocketSignature(timestamp)
       
       // 构建WebSocket URL
@@ -338,6 +399,149 @@ class VoiceRecognitionService {
       console.error('创建实时识别连接错误:', error)
       throw error
     }
+  }
+
+  /**
+   * 使用实时语音识别接口识别音频文件
+   * 将音频文件分块发送到实时识别服务，模拟实时流
+   * @param {Buffer} audioData - 音频数据
+   * @param {Object} options - 识别选项
+   * @returns {Promise<Object>} 识别结果
+   */
+  async recognizeFileWithRealtime(audioData, options = {}) {
+    return new Promise((resolve, reject) => {
+      try {
+        const {
+          engineType = '16k_zh',
+          voiceFormat = 1,
+          needvad = 1,
+          filterDirty = 0,
+          filterModal = 0,
+          filterPunc = 0,
+          convertNumMode = 1,
+          wordInfo = 2,
+          vadSilenceTime = 200
+        } = options
+
+        let finalText = ''
+        let allTexts = []
+        let wordList = []
+        let isResolved = false
+
+        // 创建实时识别连接
+        const recognition = this.createRealtimeRecognition(
+          {
+            engineType,
+            voiceFormat,
+            needvad,
+            filterDirty,
+            filterModal,
+            filterPunc,
+            convertNumMode,
+            wordInfo,
+            vadSilenceTime
+          },
+          // 识别结果回调
+          (result) => {
+            if (result.text) {
+              allTexts.push(result.text)
+              finalText = result.text // 最终结果会覆盖中间结果
+            }
+            if (result.wordList && result.wordList.length > 0) {
+              wordList = result.wordList
+            }
+
+            // 如果是最终结果，等待音频发送完成后返回
+            if (result.isFinal) {
+              // 延迟一点确保所有数据都处理完成
+              setTimeout(() => {
+                if (!isResolved) {
+                  isResolved = true
+                  recognition.close()
+                  resolve({
+                    text: finalText || allTexts.join(''),
+                    wordList: wordList,
+                    audioTime: Math.ceil(audioData.length / 3200) // 估算音频时长（16k采样率，16bit，单声道）
+                  })
+                }
+              }, 500)
+            }
+          },
+          // 错误回调
+          (error) => {
+            if (!isResolved) {
+              isResolved = true
+              reject(error)
+            }
+          }
+        )
+
+        // 将音频数据分块发送（每40ms发送一次，模拟实时流）
+        // 16k采样率，16bit，单声道：每秒3200字节，40ms = 128字节
+        const chunkSize = 128 * 10 // 每次发送1280字节（约400ms的音频）
+        let offset = 0
+
+        const sendChunk = () => {
+          if (offset >= audioData.length) {
+            // 所有数据已发送完成，等待识别结果
+            // 如果超时还没有收到最终结果，直接返回当前结果
+            setTimeout(() => {
+              if (!isResolved) {
+                isResolved = true
+                recognition.close()
+                resolve({
+                  text: finalText || allTexts.join(''),
+                  wordList: wordList,
+                  audioTime: Math.ceil(audioData.length / 3200)
+                })
+              }
+            }, 3000) // 3秒超时
+            return
+          }
+
+          const chunk = audioData.slice(offset, offset + chunkSize)
+          const isLastChunk = offset + chunkSize >= audioData.length
+
+          try {
+            recognition.send(chunk, isLastChunk)
+          } catch (error) {
+            if (!isResolved) {
+              isResolved = true
+              reject(new Error('发送音频数据失败：' + error.message))
+            }
+            return
+          }
+
+          offset += chunkSize
+
+          if (!isLastChunk) {
+            // 模拟实时发送，每40ms发送一次
+            setTimeout(sendChunk, 40)
+          } else {
+            // 如果是最后一帧，等待识别结果
+            // 如果超时还没有收到最终结果，直接返回当前结果
+            setTimeout(() => {
+              if (!isResolved) {
+                isResolved = true
+                recognition.close()
+                resolve({
+                  text: finalText || allTexts.join(''),
+                  wordList: wordList,
+                  audioTime: Math.ceil(audioData.length / 3200)
+                })
+              }
+            }, 3000) // 3秒超时
+          }
+        }
+
+        // 开始发送音频数据
+        sendChunk()
+
+      } catch (error) {
+        console.error('实时识别文件错误:', error)
+        reject(new Error('语音识别失败：' + error.message))
+      }
+    })
   }
 
   /**
