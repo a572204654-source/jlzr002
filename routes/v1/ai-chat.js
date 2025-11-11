@@ -6,7 +6,7 @@ const { query } = require('../../config/database')
 const { authenticate } = require('../../middleware/auth')
 const { randomString } = require('../../utils/crypto')
 const { chatWithContext, chatWithFile } = require('../../utils/doubao')
-const { uploadFile, getFileUrl, isValidFileType, isValidFileSize } = require('../../utils/cloudStorage')
+const { uploadFile, getFileUrl, isValidFileType, isValidFileSize } = require('../../utils/cloudStorageCOS')
 const config = require('../../config')
 
 // 配置 multer 内存存储（文件将保存在内存中，然后上传到云存储）

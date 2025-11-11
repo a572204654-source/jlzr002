@@ -4,7 +4,7 @@ const multer = require('multer')
 const { success, badRequest, serverError, notFound } = require('../utils/response')
 const { query } = require('../config/database')
 const { authenticate } = require('../middleware/auth')
-const { uploadFile, deleteFile, deleteFiles, isValidFileType, isValidFileSize } = require('../utils/cloudStorage')
+const { uploadFile, deleteFile, deleteFiles, isValidFileType, isValidFileSize } = require('../utils/cloudStorageCOS')
 const config = require('../config')
 
 // 配置 multer 内存存储

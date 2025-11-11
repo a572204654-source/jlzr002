@@ -3,8 +3,13 @@ require('dotenv').config();
 module.exports = {
   // CloudBase云托管环境配置
   cloudbase: {
-    env: process.env.CLOUDBASE_ENV || 'production',
-    envId: process.env.CLOUDBASE_ENV || '',  // 云托管自动注入 CLOUDBASE_ENV，不使用 CLOUDBASE_ENV_ID
+    // 云托管自动注入 CLOUDBASE_ENV，如果未设置或为 'production'，则回退使用 CLOUDBASE_ENV_ID
+    env: (process.env.CLOUDBASE_ENV && process.env.CLOUDBASE_ENV !== 'production') 
+      ? process.env.CLOUDBASE_ENV 
+      : (process.env.CLOUDBASE_ENV_ID || 'production'),
+    envId: (process.env.CLOUDBASE_ENV && process.env.CLOUDBASE_ENV !== 'production') 
+      ? process.env.CLOUDBASE_ENV 
+      : (process.env.CLOUDBASE_ENV_ID || ''),
   },
 
   // 数据库配置
@@ -74,7 +79,10 @@ module.exports = {
 
   // 云存储配置
   cloudStorage: {
-    envId: process.env.CLOUDBASE_ENV || '',  // 云托管自动注入 CLOUDBASE_ENV
+    // 云托管自动注入 CLOUDBASE_ENV，如果未设置或为 'production'，则回退使用 CLOUDBASE_ENV_ID
+    envId: (process.env.CLOUDBASE_ENV && process.env.CLOUDBASE_ENV !== 'production') 
+      ? process.env.CLOUDBASE_ENV 
+      : (process.env.CLOUDBASE_ENV_ID || ''),
     secretId: process.env.TENCENTCLOUD_SECRET_ID || process.env.TENCENT_SECRET_ID || '',
     secretKey: process.env.TENCENTCLOUD_SECRET_KEY || process.env.TENCENT_SECRET_KEY || '',
     // 云存储默认域名
