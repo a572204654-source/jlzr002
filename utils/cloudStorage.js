@@ -18,15 +18,26 @@ function initCloudBase() {
   const { envId, secretId, secretKey } = config.cloudStorage
 
   if (!envId || !secretId || !secretKey) {
-    throw new Error('云存储配置不完整，请检查环境变量 CLOUDBASE_ENV_ID、TENCENTCLOUD_SECRET_ID、TENCENTCLOUD_SECRET_KEY')
+    throw new Error('云存储配置不完整，请检查环境变量 CLOUDBASE_ENV、TENCENTCLOUD_SECRET_ID、TENCENTCLOUD_SECRET_KEY')
   }
 
   // 根据 CloudBase Node.js SDK 官方文档，服务端初始化使用 env 参数
-  app = cloudbase.init({
-    env: envId,  // 使用 env 参数（官方文档推荐）
-    secretId: secretId,
-    secretKey: secretKey
-  })
+  // 尝试两种初始化方式：env 和 envId
+  try {
+    app = cloudbase.init({
+      env: envId,  // 使用 env 参数（官方文档推荐）
+      secretId: secretId,
+      secretKey: secretKey
+    })
+  } catch (error) {
+    // 如果 env 参数失败，尝试使用 envId 参数
+    console.warn('使用 env 参数初始化失败，尝试使用 envId 参数:', error.message)
+    app = cloudbase.init({
+      envId: envId,
+      secretId: secretId,
+      secretKey: secretKey
+    })
+  }
 
   return app
 }
@@ -41,6 +52,15 @@ function initCloudBase() {
 async function uploadFile(fileContent, fileName, folder = null) {
   try {
     const app = initCloudBase()
+    
+    // 调试信息：检查配置
+    const { envId, secretId, secretKey } = config.cloudStorage
+    console.log('云存储配置检查:', {
+      hasEnvId: !!envId,
+      envIdPrefix: envId ? `${envId.substring(0, 10)}...` : '(未设置)',
+      hasSecretId: !!secretId,
+      hasSecretKey: !!secretKey
+    })
 
     // 生成文件路径
     const timestamp = Date.now()
@@ -51,6 +71,8 @@ async function uploadFile(fileContent, fileName, folder = null) {
     
     const folderPath = folder || config.cloudStorage.prefix
     const cloudPath = `${folderPath}/${finalFileName}`
+
+    console.log('准备上传文件:', { cloudPath, fileName: finalFileName, size: fileContent.length })
 
     // 上传文件（根据 CloudBase Node.js SDK 文档，直接在 app 上调用）
     const result = await app.uploadFile({

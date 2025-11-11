@@ -199,6 +199,17 @@ app.get('/diagnose', (req, res) => {
       region: process.env.TENCENT_REGION || 'ap-guangzhou',
       usingStandardVars: !!(process.env.TENCENTCLOUD_SECRET_ID && process.env.TENCENTCLOUD_SECRET_KEY)
     },
+    cloudStorage: {
+      hasEnvId: !!process.env.CLOUDBASE_ENV,
+      envId: process.env.CLOUDBASE_ENV || '(未设置)',
+      hasSecretId: !!(process.env.TENCENTCLOUD_SECRET_ID || process.env.TENCENT_SECRET_ID),
+      hasSecretKey: !!(process.env.TENCENTCLOUD_SECRET_KEY || process.env.TENCENT_SECRET_KEY),
+      isConfigured: !!(process.env.CLOUDBASE_ENV && 
+        (process.env.TENCENTCLOUD_SECRET_ID || process.env.TENCENT_SECRET_ID) && 
+        (process.env.TENCENTCLOUD_SECRET_KEY || process.env.TENCENT_SECRET_KEY)),
+      note: !process.env.CLOUDBASE_ENV ? 
+        '⚠️ 缺少 CLOUDBASE_ENV 环境变量（云托管会自动注入，如果未设置请检查云托管配置）' : null
+    },
     diagnosis: {
       isProduction: process.env.NODE_ENV === 'production',
       shouldUseInternal: process.env.NODE_ENV === 'production',
