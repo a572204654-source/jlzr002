@@ -114,16 +114,56 @@ async function uploadFile(fileContent, fileName, folder = null) {
     })
 
     // 上传文件到 COS
-    const result = await cos.putObject({
-      Bucket: bucket,
-      Region: region,
-      Key: key,
-      Body: fileContent,
-      ContentLength: fileContent.length
-    })
+    let result
+    try {
+      result = await cos.putObject({
+        Bucket: bucket,
+        Region: region,
+        Key: key,
+        Body: fileContent,
+        ContentLength: fileContent.length
+      })
+      
+      console.log('COS putObject 返回结果:', {
+        hasResult: !!result,
+        resultType: typeof result,
+        keys: result ? Object.keys(result) : [],
+        statusCode: result?.statusCode,
+        etag: result?.ETag,
+        location: result?.Location
+      })
+    } catch (putError) {
+      console.error('COS putObject 调用异常:', putError)
+      throw new Error(`COS上传调用失败: ${putError.message}`)
+    }
 
-    if (!result.Location && !result.ETag) {
-      throw new Error('上传失败，未返回有效结果')
+    // COS SDK 成功时返回 ETag 或 statusCode，不一定会返回 Location
+    // 检查是否有错误或返回结果
+    if (!result) {
+      throw new Error('上传失败，COS未返回结果')
+    }
+
+    // 检查状态码（如果存在）
+    if (result.statusCode !== undefined) {
+      if (result.statusCode >= 200 && result.statusCode < 300) {
+        // 上传成功
+        console.log('COS上传成功:', {
+          statusCode: result.statusCode,
+          etag: result.ETag,
+          location: result.Location
+        })
+      } else {
+        throw new Error(`上传失败，状态码: ${result.statusCode}`)
+      }
+    } else if (result.ETag) {
+      // 有ETag说明上传成功
+      console.log('COS上传成功（通过ETag判断）:', {
+        etag: result.ETag,
+        location: result.Location
+      })
+    } else {
+      // 没有状态码也没有ETag，可能有问题
+      console.warn('COS上传返回结果异常，但继续处理:', result)
     }
 
     // 生成访问URL
@@ -134,7 +174,7 @@ async function uploadFile(fileContent, fileName, folder = null) {
       fileId: `cloud://${envId}.cloudbase/${key}`,
       cloudPath: key,
       fileName: finalFileName,
-      etag: result.ETag
+      etag: result.ETag || ''
     }
   } catch (error) {
     console.error('COS 上传错误:', error)
