@@ -114,17 +114,35 @@ async function uploadFile(fileContent, fileName, folder = null) {
     })
 
     // 上传文件到 COS
+    // 使用Promise包装确保正确处理
     let result
     try {
-      result = await cos.putObject({
-        Bucket: bucket,
-        Region: region,
-        Key: key,
-        Body: fileContent,
-        ContentLength: fileContent.length
+      console.log('开始调用COS putObject...')
+      
+      // 使用Promise包装，确保正确处理
+      result = await new Promise((resolve, reject) => {
+        cos.putObject({
+          Bucket: bucket,
+          Region: region,
+          Key: key,
+          Body: fileContent,
+          ContentLength: fileContent.length
+        }, (err, data) => {
+          if (err) {
+            console.error('COS putObject 回调错误:', err)
+            reject(err)
+          } else {
+            console.log('COS putObject 回调成功:', {
+              hasData: !!data,
+              dataType: typeof data,
+              keys: data ? Object.keys(data) : []
+            })
+            resolve(data)
+          }
+        })
       })
       
-      console.log('COS putObject 返回结果:', {
+      console.log('COS putObject Promise返回结果:', {
         hasResult: !!result,
         resultType: typeof result,
         keys: result ? Object.keys(result) : [],
@@ -133,14 +151,23 @@ async function uploadFile(fileContent, fileName, folder = null) {
         location: result?.Location
       })
     } catch (putError) {
-      console.error('COS putObject 调用异常:', putError)
-      throw new Error(`COS上传调用失败: ${putError.message}`)
+      console.error('COS putObject 调用异常:', {
+        message: putError.message,
+        code: putError.code,
+        statusCode: putError.statusCode,
+        error: putError
+      })
+      throw new Error(`COS上传调用失败: ${putError.message || putError.code || '未知错误'}`)
     }
 
     // COS SDK 成功时返回 ETag 或 statusCode，不一定会返回 Location
     // 检查是否有错误或返回结果
     if (!result) {
-      throw new Error('上传失败，COS未返回结果')
+      console.error('COS putObject 返回 undefined，可能的原因:')
+      console.error('1. Bucket名称不正确:', bucket)
+      console.error('2. Region不正确:', region)
+      console.error('3. 权限不足或Secret ID/Key无效')
+      throw new Error('上传失败，COS未返回结果。请检查Bucket名称、Region和权限配置')
     }
 
     // 检查状态码（如果存在）
