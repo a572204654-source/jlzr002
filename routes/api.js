@@ -35,6 +35,7 @@ router.get('/', (req, res) => {
       supervisionLog: '监理日志模块 - 日志CRUD、导出',
       aiChat: 'AI助手模块 - 对话管理',
       attachment: '附件模块 - 文件上传、管理',
+      upload: '文件上传模块 - 云存储文件上传',
       weather: '气象模块 - 根据位置获取气象信息'
     },
     endpoints: {
@@ -45,6 +46,7 @@ router.get('/', (req, res) => {
       supervisionLogs: '/api/supervision-logs - 监理日志相关接口',
       aiChat: '/api/ai-chat/* - AI助手相关接口',
       attachments: '/api/attachments - 附件相关接口',
+      upload: '/api/upload - 文件上传接口',
       weather: '/api/weather/current - 气象相关接口'
     }
   })

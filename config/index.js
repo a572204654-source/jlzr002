@@ -72,5 +72,20 @@ module.exports = {
     cacheTime: 300 // 缓存5分钟
   },
 
+  // 云存储配置
+  cloudStorage: {
+    envId: process.env.CLOUDBASE_ENV_ID || '',
+    secretId: process.env.TENCENTCLOUD_SECRET_ID || process.env.TENCENT_SECRET_ID || '',
+    secretKey: process.env.TENCENTCLOUD_SECRET_KEY || process.env.TENCENT_SECRET_KEY || '',
+    // 云存储默认域名
+    domain: process.env.CLOUD_STORAGE_DOMAIN || '6a6c-jlzr1101-5g9kplxza13a780d-1302271970.tcb.qcloud.la',
+    // 存储路径前缀
+    prefix: process.env.CLOUD_STORAGE_PREFIX || 'uploads',
+    // 最大文件大小（字节，默认10MB）
+    maxFileSize: parseInt(process.env.CLOUD_STORAGE_MAX_SIZE) || 10 * 1024 * 1024,
+    // 允许的文件类型
+    allowedTypes: (process.env.CLOUD_STORAGE_ALLOWED_TYPES || 'image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document').split(',')
+  },
+
 };
 

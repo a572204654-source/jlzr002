@@ -177,11 +177,42 @@ async function getAISuggestion(question, context = '') {
   return await callDoubaoAPI(messages)
 }
 
+/**
+ * 带文件的多轮对话（支持文件 URL）
+ * @param {Array} conversationHistory - 对话历史 [{role: 'user'|'assistant', content: '...'}]
+ * @param {string} newMessage - 新消息
+ * @param {string|Array} fileUrls - 文件 URL 或 URL 数组
+ * @param {Object} options - 可选配置
+ * @returns {Promise<string>} AI回复
+ */
+async function chatWithFile(conversationHistory, newMessage, fileUrls, options = {}) {
+  // 将文件 URL 转换为数组格式
+  const fileUrlArray = Array.isArray(fileUrls) ? fileUrls : [fileUrls]
+  
+  // 构建包含文件 URL 的消息内容
+  let messageContent = newMessage
+  if (fileUrlArray.length > 0) {
+    const fileUrlsText = fileUrlArray.map((url, index) => `文件${index + 1}: ${url}`).join('\n')
+    messageContent = `${newMessage}\n\n请读取并分析以下文件：\n${fileUrlsText}`
+  }
+  
+  const messages = [
+    ...conversationHistory,
+    {
+      role: 'user',
+      content: messageContent
+    }
+  ]
+  
+  return await callDoubaoAPI(messages, options)
+}
+
 module.exports = {
   callDoubaoAPI,
   chatWithDoubao,
   chatWithContext,
   optimizeSupervisionLog,
-  getAISuggestion
+  getAISuggestion,
+  chatWithFile
 }
 

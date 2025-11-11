@@ -20,6 +20,9 @@ var usersRouter = require('./routes/users');
 // API路由（已去掉v1前缀）
 var apiRouter = require('./routes/api');
 
+// v1 API路由
+var v1ApiRouter = require('./routes/v1');
+
 // 天气路由
 var weatherRouter = require('./routes/weather');
 var weatherSimpleRouter = require('./routes/weather-simple');
@@ -78,6 +81,13 @@ app.use('/users', usersRouter);
 
 // API路由（监理日志小程序）
 app.use('/api', apiRouter);
+
+// v1 API路由
+app.use('/api/v1', v1ApiRouter);
+
+// 文件上传路由
+const uploadRouter = require('./routes/upload');
+app.use('/api/upload', uploadRouter);
 
 // 天气API路由
 app.use('/api/weather', weatherRouter);
